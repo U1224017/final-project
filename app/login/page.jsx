@@ -67,31 +67,20 @@ export default function LoginPage() {
                 <div className="mt-6 text-center">
                     <form action="" className="space-y-3">
                         <button
-                            type="submit"
-                            name="provider"
-                            value="google"
+                            type="button"
+                            onClick={() => signIn("google")}
                             className="w-full bg-white text-gray-800 border border-gray-300 py-2 px-4 rounded-md flex items-center justify-center gap-2 shadow hover:bg-gray-50 transition"
                         >
-                            <Image
-                                src="/google.png"
-                                alt="Google"
-                                width={24}
-                                height={24}
-                            />
+                            <Image src="/google.png" alt="Google" width={24} height={24} />
                             使用 Google 登入
                         </button>
+
                         <button
-                            type="submit"
-                            name="provider"
-                            value="github"
+                            type="button"
+                            onClick={() => signIn("github")}
                             className="w-full bg-white text-gray-800 border border-gray-300 py-2 px-4 rounded-md flex items-center justify-center gap-2 shadow hover:bg-gray-50 transition"
                         >
-                            <Image
-                                src="/github.png"
-                                alt="GitHub"
-                                width={24}
-                                height={24}
-                            />
+                            <Image src="/github.png" alt="GitHub" width={24} height={24} />
                             使用 GitHub 登入
                         </button>
                     </form>
