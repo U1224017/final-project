@@ -17,7 +17,7 @@ export default function AdminUsersPage() {
 
     useEffect(() => {
         const getUsers = async () => {
-            const response = await fetch("/api/notifications/users");
+            const response = await fetch("/api/users");
             if (!response.ok) {
                 alert("獲取使用者失敗");
             }
@@ -41,7 +41,7 @@ export default function AdminUsersPage() {
         setUsers((prev) =>
             prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
         );
-        const response = await fetch(`/api/notifications/users/${userId}/role`, {
+        const response = await fetch(`/api/users/${userId}/role`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ role: newRole }),

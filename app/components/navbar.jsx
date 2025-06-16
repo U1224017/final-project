@@ -1,7 +1,7 @@
 // app/components/navbar.jsx
 "use client";
 
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 // ✨ 移除這行：import { useEffect, useState } from "react";
 // ✨ 移除這行：import useUser from "@/hooks/useUser"; // 不再需要 useUser hook
