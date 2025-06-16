@@ -15,8 +15,7 @@ export default function MenuManagementPage() {
     });
     const [editingId, setEditingId] = useState(null);
     const [editItem, setEditItem] = useState({});
-    const [imageFile, setImageFile] = useState(null);
-    const [imageUrl, setImageUrl] = useState("");
+
 
     useEffect(() => {
         const getMenu = async () => {
@@ -147,147 +146,130 @@ export default function MenuManagementPage() {
                     </h1>
                     <button
                         onClick={() => {
-                            setImageFile(null);
-                            setImageUrl("");
+                            setNewItem({
+                            name: "",
+                            description: "",
+                            price: 0,
+                            imageUrl: "",
+                            isAvailable: true,
+                            });
                             setIsCreating(true);
                         }}
                         className="bg-gradient-to-r from-pink-500 to-red-500 text-white px-6 py-2 rounded-md shadow hover:opacity-90 transition w-full sm:w-auto"
-                    >
+                        >
                         新增菜單
                     </button>
+
                 </div>
 
                 {isCreating && (
                     <div className="bg-white p-6 rounded-lg shadow-lg mb-10">
                         <h2 className="text-xl font-semibold mb-4">新增餐點</h2>
                         <form
-                            onSubmit={handleCreate}
-                            className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                        onSubmit={handleCreate}
+                        className="grid grid-cols-1 md:grid-cols-2 gap-6"
                         >
-                            <div>
-                                <label className="block mb-1 text-sm font-medium text-gray-700">
-                                    名稱
-                                </label>
-                                <input
-                                    type="text"
-                                    value={newItem.name}
-                                    onChange={(e) =>
-                                        setNewItem({
-                                            ...newItem,
-                                            name: e.target.value,
-                                        })
-                                    }
-                                    className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-pink-400"
-                                    required
-                                />
-                            </div>
+                        <div>
+                            <label className="block mb-1 text-sm font-medium text-gray-700">
+                            名稱
+                            </label>
+                            <input
+                            type="text"
+                            value={newItem.name}
+                            onChange={(e) =>
+                                setNewItem({
+                                ...newItem,
+                                name: e.target.value,
+                                })
+                            }
+                            className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-pink-400"
+                            required
+                            />
+                        </div>
 
-                            <div>
-                                <label className="block mb-1 text-sm font-medium text-gray-700">
-                                    價格
-                                </label>
-                                <input
-                                    type="number"
-                                    value={newItem.price}
-                                    onChange={(e) =>
-                                        setNewItem({
-                                            ...newItem,
-                                            price: parseFloat(e.target.value),
-                                        })
-                                    }
-                                    className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-pink-400"
-                                    required
-                                />
-                            </div>
+                        <div>
+                            <label className="block mb-1 text-sm font-medium text-gray-700">
+                            價格
+                            </label>
+                            <input
+                            type="number"
+                            value={newItem.price}
+                            onChange={(e) =>
+                                setNewItem({
+                                ...newItem,
+                                price: parseFloat(e.target.value),
+                                })
+                            }
+                            className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-pink-400"
+                            required
+                            />
+                        </div>
 
-                            <div className="md:col-span-2">
-                                <label className="block mb-1 text-sm font-medium text-gray-700">
-                                    描述
-                                </label>
-                                <textarea
-                                    value={newItem.description}
-                                    onChange={(e) =>
-                                        setNewItem({
-                                            ...newItem,
-                                            description: e.target.value,
-                                        })
-                                    }
-                                    className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-pink-400"
-                                />
-                            </div>
+                        <div className="md:col-span-2">
+                            <label className="block mb-1 text-sm font-medium text-gray-700">
+                            描述
+                            </label>
+                            <textarea
+                            value={newItem.description}
+                            onChange={(e) =>
+                                setNewItem({
+                                ...newItem,
+                                description: e.target.value,
+                                })
+                            }
+                            className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-pink-400"
+                            />
+                        </div>
 
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    圖片上傳
-                                </label>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) =>
-                                            setImageFile(e.target.files[0])
-                                        }
-                                        className="flex-1 text-sm text-gray-700 file:mr-4 file:py-2 file:px-4
-                                                   file:rounded-full file:border-0
-                                                   file:text-sm file:font-semibold
-                                                   file:bg-blue-50 file:text-blue-700
-                                                   hover:file:bg-blue-100"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleImageUpload}
-                                        disabled={!imageFile}
-                                        className={`px-4 py-2 text-white rounded transition
-                                        ${
-                                            imageFile
-                                                ? "bg-blue-600 hover:bg-blue-700"
-                                                : "bg-gray-400 cursor-not-allowed"
-                                        }`}
-                                    >
-                                        上傳圖片
-                                    </button>
-                                </div>
-                            </div>
+                        <div className="md:col-span-2">
+                            <label className="block mb-1 text-sm font-medium text-gray-700">
+                            圖片 URL
+                            </label>
+                            <input
+                            type="text"
+                            value={newItem.imageUrl || ""}
+                            onChange={(e) =>
+                                setNewItem({
+                                ...newItem,
+                                imageUrl: e.target.value,
+                                })
+                            }
+                            placeholder="請輸入圖片網址"
+                            className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-pink-400"
+                            required
+                            />
+                        </div>
 
-                            {imageUrl && (
-                                <div className="mt-4">
-                                    <p className="text-sm text-gray-600">
-                                        圖片預覽：
-                                    </p>
-                                    <Image
-                                        src={imageUrl}
-                                        width={400}
-                                        height={300}
-                                        alt="預覽"
-                                        className="mt-2 w-full max-h-64 object-contain rounded-lg border"
-                                    />
-                                    <input
-                                        type="text"
-                                        className="mt-2 w-full border px-3 py-2 rounded bg-gray-50"
-                                        value={imageUrl}
-                                        readOnly
-                                    />
-                                </div>
-                            )}
-
-                            <div className="flex flex-col sm:flex-row gap-4 md:col-span-2">
-                                <button
-                                    type="submit"
-                                    className="bg-gradient-to-r from-pink-500 to-red-500 text-white px-4 py-2 rounded-md shadow hover:opacity-90 transition"
-                                >
-                                    新增
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCreating(false)}
-                                    className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
-                                >
-                                    取消
-                                </button>
+                        {newItem.imageUrl && (
+                            <div className="md:col-span-2 mt-4">
+                            <p className="text-sm text-gray-600">圖片預覽：</p>
+                            <img
+                                src={newItem.imageUrl}
+                                alt="預覽"
+                                className="mt-2 w-full max-h-64 object-contain rounded-lg border"
+                            />
                             </div>
+                        )}
+
+                        <div className="flex flex-col sm:flex-row gap-4 md:col-span-2">
+                            <button
+                            type="submit"
+                            className="bg-gradient-to-r from-pink-500 to-red-500 text-white px-4 py-2 rounded-md shadow hover:opacity-90 transition"
+                            >
+                            新增
+                            </button>
+                            <button
+                            type="button"
+                            onClick={() => setIsCreating(false)}
+                            className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+                            >
+                            取消
+                            </button>
+                        </div>
                         </form>
                     </div>
-                )}
+                    )}
+
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {menuItems.map((item) =>
