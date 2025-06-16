@@ -1,20 +1,27 @@
+// app/components/notifyButton.jsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import useNotifications from "@/hooks/useNotifications";
-import useUser from "@/hooks/useUser";
-import { deleteNotification } from "@/app/actions/notification";
+// import useUser from "@/hooks/useUser"; // ✨ 移除這行，不再需要 useUser
+import useNotifications from "@/hooks/useNotifications"; // 保持這行
+import { deleteNotification } from "@/app/actions/notification"; // 保持這行
 
-export default function NotifyButton() {
+// ✨ 修改：NotifyButton 現在接受 userId 作為 props
+export default function NotifyButton({ userId }) {
     const [showNotify, setShowNotify] = useState(false);
-    const { user, loading } = useUser();
-    const { notifications, unreadCount, setNotifications } = useNotifications();
+    // ✨ 修改：直接將 userId 傳遞給 useNotifications
+    // useNotifications 內部將負責處理 userId 是否存在的邏輯
+    const { notifications, unreadCount, setNotifications } = useNotifications(userId);
     const wrapperRef = useRef(null);
 
     useEffect(() => {
-        if (loading) {
+        // ✨ 修改：這裡的 loading 檢查現在應該由 userId 是否存在來判斷，
+        // 因為 useNotifications 內部已經處理了載入狀態
+        // 如果 userId 不存在，則直接返回，不需監聽點擊外部事件，因為按鈕根本不應該出現
+        if (!userId) {
             return;
         }
+
         const handleClickOutside = (event) => {
             if (
                 wrapperRef.current &&
@@ -23,51 +30,90 @@ export default function NotifyButton() {
                 setShowNotify(false);
             }
         };
+
         if (showNotify) {
             document.addEventListener("mousedown", handleClickOutside);
         } else {
             document.removeEventListener("mousedown", handleClickOutside);
         }
+
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
-    }, [showNotify, loading]);
+    }, [showNotify, userId]); // ✨ 依賴中加入 userId
 
     const handelClickNotificationButton = async () => {
+        // ✨ 增加安全檢查：如果 userId 不存在，則直接返回
+        if (!userId) {
+            alert("用戶未登入，無法操作通知。");
+            return;
+        }
+
         setShowNotify((prev) => !prev);
-        setNotifications(
-            notifications.map((n) => {
-                return { ...n, read: true };
-            })
-        );
+
+        // 如果要標記為已讀，確保有通知才操作
+        if (notifications.length > 0) {
+            setNotifications(
+                notifications.map((n) => {
+                    return { ...n, read: true };
+                })
+            );
+
+            try {
+                // ✨ 修改：使用 userId 而不是 user.id
+                const response = await fetch(
+                    `/api/notifications/users/${userId}/isRead`,
+                    {
+                        method: "PATCH",
+                    }
+                );
+                if (!response.ok) {
+                    alert("切換已讀通知失敗");
+                }
+            } catch (err) {
+                alert("錯誤：" + err.message); // 更友善地顯示錯誤訊息
+            }
+        }
+    };
+
+    const handleDeleteNotification = async (nId) => {
+        // ✨ 增加安全檢查：如果 userId 不存在，則直接返回
+        if (!userId) {
+            alert("用戶未登入，無法刪除通知。");
+            return;
+        }
+
+        // 這裡你的程式碼使用了 deleteNotification(nId) 和 fetch /api/notifications/${nId} 兩種方式
+        // 建議只保留一種，通常是 API route 方式。
+        // 如果 deleteNotification 是一個 Server Action，它應該是獨立且最終的。
+        // 為了簡單起見，我會假設你最終透過 API route 處理，或者 deleteNotification 內部會調用 API。
 
         try {
-            const response = await fetch(
-                `/api/notifications/users/${user.id}/isRead`,
-                {
-                    method: "PATCH",
+            const data = await deleteNotification(nId); // 這是 Server Action
+            if (!data || data.error) { // 檢查 Server Action 的結果
+                 // 如果 Server Action 失敗，可以選擇呼叫 API route 作為備用或只依賴一個
+                const response = await fetch(`/api/notifications/${nId}`, {
+                    method: "DELETE",
+                });
+                if (!response.ok) {
+                    alert("刪除通知失敗");
+                    return;
                 }
-            );
-            if (!response.ok) {
-                alert("切換已讀通知失敗");
             }
         } catch (err) {
-            alert("錯誤：", err);
+            alert("刪除通知錯誤：" + err.message);
+            return;
         }
-    };
-    const handleDeleteNotification = async (nId) => {
-        const data = await deleteNotification(nId);
-        if (!data) {
-            const response = await fetch(`/api/notifications/${nId}`, {
-                method: "DELETE",
-            });
-            if (!response.ok) {
-                alert("刪除通知失敗");
-                return;
-            }
-        }
+        
         setNotifications(notifications.filter((n) => n.id !== nId));
     };
+
+    // ✨ 關鍵修改：只有當 userId 存在時才渲染整個按鈕組件
+    // 如果沒有 userId，代表用戶未登入或會話仍在載入，此時不應該顯示通知按鈕
+    if (!userId) {
+        return null;
+    }
+
     return (
         <div className="relative" ref={wrapperRef}>
             <button
