@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import useUser from "@/hooks/useUser";
 import { useMqttClient } from "@/hooks/useMqttClient";
+import { getKitchenReadyOrderTopic, getCustomerOrderUpdateTopic } from "@/utils/mqttTopic";
 import {
     editOrderStatus,
     getOrderById,
@@ -32,7 +33,7 @@ export default function ReadyOrdersPage() {
                 let data = await getReadyOrders();
                 if (!data) {
                     // api
-                    const response = await fetch(`/api/orders/ready`);
+                    const response = await fetch(`/api/order/ready`);
                     if (!response.ok) {
                         alert("獲取完成訂單失敗");
                         return;
@@ -78,7 +79,7 @@ export default function ReadyOrdersPage() {
     const handleCompleteButton = async (orderId) => {
         let data = await editOrderStatus({ status: "COMPLETED" }, orderId);
         if (!data) {
-            const response = await fetch(`/api/orders/${orderId}/status`, {
+            const response = await fetch(`/api/order/${orderId}/status`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: "COMPLETED" }),
@@ -87,14 +88,16 @@ export default function ReadyOrdersPage() {
                 alert("修改訂單狀態失敗");
                 return;
             }
+            data = await response.json(); // 加這行
         }
 
-        setOrders(orders.filter((o) => o.id !== orderId));
-        // action
+        // 先從畫面移除
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+
+        // 取得完整訂單資料（用於通知顧客）
         let orderData = await getOrderById(orderId);
         if (!orderData) {
-            // api
-            const orderRes = await fetch(`/api/orders/${orderId}`);
+            const orderRes = await fetch(`/api/order/${orderId}`);
             if (!orderRes.ok) {
                 alert("獲取訂單詳情失敗");
                 return;
@@ -102,14 +105,23 @@ export default function ReadyOrdersPage() {
             orderData = await orderRes.json();
         }
 
-        // 取出訂單的顧客 ID
+        // 發布 MQTT 通知給顧客
         const customerId = orderData.customer?.id;
+        if (!customerId) {
+            console.warn("找不到顧客 ID，無法發布 MQTT 訊息");
+            return;
+        }
 
-        // TODO: 設定 MQTT 主題
-        const topic = "";
-        // TODO: 準備發布交易完成的 MQTT 訊息
+        const topic = getCustomerOrderUpdateTopic(customerId); // 顧客專屬更新主題
+        const payload = JSON.stringify({
+            type: "ORDER_COMPLETED",
+            orderId: orderData.id,
+            status: "COMPLETED",
+            timestamp: new Date().toISOString(),
+        });
 
-        // TODO: 發布交易完成的 MQTT 訊息
+        publishMessage(topic, payload);
+        console.log("📢 已發布 MQTT 通知：", topic, payload);
     };
 
     return (

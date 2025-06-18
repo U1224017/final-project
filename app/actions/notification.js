@@ -27,20 +27,19 @@ export const addNotification = async (body, userId) => {
 
 export const getUserNotification = async (userId) => {
     try {
-        // ✨ 這裡應該是從資料庫獲取使用者通知的邏輯
-        if (!userId) {
-            throw new Error("User ID is required for fetching notifications.");
-        }
+        if (!userId) throw new Error("User ID is required for fetching notifications.");
+
         const notifications = await prisma.notification.findMany({
-            where: { userId: userId },
-            orderBy: { createdAt: 'desc' }, // 按最新排序
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
         });
         return notifications;
     } catch (error) {
         console.error("Failed to get user notifications (Server Action):", error);
-        return { error: error.message }; // 返回錯誤訊息，以便前端處理
+        return []; // ⚠️ 回傳空陣列，避免前端崩潰
     }
 };
+
 
 export const deleteNotification = async (notificationId) => {
     try {

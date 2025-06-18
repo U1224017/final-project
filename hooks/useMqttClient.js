@@ -1,11 +1,9 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
-
 import { useEffect, useState, useRef } from "react";
 import mqtt from "mqtt";
 
 export function useMqttClient({
-    brokerUrl = "wss://broker.emqx.io:8084/mqtt",
+    brokerUrl = process.env.NEXT_PUBLIC_MQTT_URL || "wss://broker.emqx.io:8084/mqtt",
     subscribeTopics = [],
     publishTopic = "",
     mqttOptions = {},
@@ -15,9 +13,7 @@ export function useMqttClient({
     const clientRef = useRef(null);
 
     useEffect(() => {
-        const clientId = `nextjs-client-${Math.random()
-            .toString(16)
-            .slice(2, 10)}`;
+        const clientId = `nextjs-client-${Math.random().toString(16).slice(2, 10)}`;
         const client = mqtt.connect(brokerUrl, {
             clientId,
             clean: true,
@@ -70,15 +66,12 @@ export function useMqttClient({
 
     const publishMessage = (topic, msg) => {
         const client = clientRef.current;
-        if (!topic) {
-            topic = publishTopic;
-        }
+        if (!topic) topic = publishTopic;
         if (client && isConnected && topic && msg.trim()) {
             client.publish(topic, msg, { qos: 0 }, (err) => {
                 if (err) {
                     console.error(`發佈消息到 ${topic} 失敗:`, err);
                 } else {
-                    // console.log(`已發佈消息到 ${topic}: ${msg}`);
                     console.log(`已發佈消息到 ${topic}`);
                 }
             });

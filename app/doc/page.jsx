@@ -405,7 +405,7 @@ export default function page() {
                         "在 /kitchen 取得廚房訂單。對應action：getKitchenOrders"
                     }
                     apiType={"get"}
-                    apiUrl={"/api/orders/kitchen"}
+                    apiUrl={"/api/kitchen"}
                     responseObj={[
                         {
                             id: "orderId",

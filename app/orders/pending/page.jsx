@@ -2,169 +2,266 @@
 
 import { useEffect, useState } from "react";
 import { useMqttClient } from "@/hooks/useMqttClient";
-import { editOrderStatus, getPendingOrders } from "@/app/actions/order";
+import { editOrderStatus, getPendingOrders, deleteOrder } from "@/app/actions/order";
 import { addNotification } from "@/app/actions/notification";
+import {
+    getOrderCheckoutTopic,
+    getCustomerCancelOrderTopic,
+    getNotificationTopicByUserId,
+    getOrderToKitchenTopic
+} from "@/utils/mqttTopic";
 
 export default function PendingOrdersPage() {
     const [orders, setOrders] = useState([]);
-    // 顧客下單的
-    const [topics, setTopics] = useState([]);
-
     const { messages, publishMessage } = useMqttClient({
-        subscribeTopics: topics ? topics : [],
+        subscribeTopics: [
+            getOrderCheckoutTopic(),
+            getCustomerCancelOrderTopic("#"),
+        ],
     });
 
     useEffect(() => {
-        // 設定 MQTT 主題
-        const newTopics = [
-            getOrderCheckoutTopic(),
-            getCustomerCancelOrderTopic("#"),
-        ];
-        setTopics(newTopics);
-
         const getOrders = async () => {
             try {
-                // action
                 let data = await getPendingOrders();
                 if (!data) {
-                    const response = await fetch(`/api/orders/pending`);
+                    const response = await fetch(`/api/order`);
                     if (!response.ok) {
-                        alert("獲取待處理訂單失敗");
+                        alert("獲取訂單失敗");
                         return;
                     }
                     data = await response.json();
                 }
-                setOrders(data);
+                setOrders(data.map(order => ({ ...order, uiAccepted: false })));
             } catch (err) {
-                alert("獲取待處理訂單失敗");
+                console.error("獲取訂單失敗:", err);
+                alert("獲取訂單失敗");
             }
         };
         getOrders();
     }, []);
 
-    // 當收到 MQTT 訊息時，更新訂單狀態
     useEffect(() => {
         if (messages.length === 0) return;
 
         const lastMessage = messages[messages.length - 1];
-        // 檢查是否為結帳訊息
-        const isCheckoutOrder = lastMessage.topic.includes("checkout");
-        // 檢查是否為取消訂單的訊息
-        const isCancelOrder = lastMessage.topic.includes("cancel");
+        const topic = lastMessage.topic;
+
+        const isCheckoutOrder = topic === getOrderCheckoutTopic();
+        const isCancelOrder = topic.startsWith(getCustomerCancelOrderTopic(""));
 
         if (isCheckoutOrder) {
             try {
                 const newOrder = JSON.parse(lastMessage.payload);
-                setOrders((prev) => {
-                    // 檢查是否已存在相同 ID 的訂單
-                    const exists = prev.some(
-                        (order) => order.id === newOrder.id
-                    );
-                    return exists ? prev : [newOrder, ...prev];
-                });
+                setOrders((prev) =>
+                    prev.some((order) => order.id === newOrder.id)
+                        ? prev
+                        : [{ ...newOrder, uiAccepted: false }, ...prev]
+                );
             } catch (err) {
-                console.error("無法解析 MQTT 訊息:", err);
+                console.error("無法解析新訂單的 MQTT 訊息:", err);
             }
         }
+
         if (isCancelOrder) {
             try {
                 const payload = JSON.parse(lastMessage.payload);
-                const orderId = payload.orderId;
-                setOrders((prev) =>
-                    prev.filter((order) => order.id !== orderId)
-                );
+                setOrders((prev) => prev.filter((order) => order.id !== payload.orderId));
             } catch (err) {
                 console.error("無法解析取消訂單的 MQTT 訊息:", err);
             }
         }
     }, [messages]);
 
+    const updateOrderStatus = (orderId, updates) => {
+        setOrders((prev) =>
+            prev.map((order) =>
+                order.id === orderId ? { ...order, ...updates } : order
+            )
+        );
+    };
+
     const handleAcceptOrder = async (orderId) => {
-        try {
-            let response;
-            // action
-            let data = await editOrderStatus({ status: "PREPARING" }, orderId);
+        const acceptedOrder = orders.find((order) => order.id === orderId);
+        if (!acceptedOrder) return;
 
-            if (!data) {
-                // api
-                response = await fetch(`/api/orders/${orderId}/status`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status: "PREPARING" }),
-                });
-                if (!response.ok) {
-                    alert("修改訂單狀態失敗");
-                    return;
-                }
-            }
-            setOrders((prev) => prev.filter((order) => order.id !== orderId));
-
-            // 傳送通知
-            const customerId = orders.find(
-                (order) => order.id === orderId
-            ).customerId;
-
-            // action
-            let notificationRes = await addNotification(
-                {
-                    orderId,
-                    message: `訂單 ${orderId.slice(0, 8)} 正在製作中`,
-                },
-                customerId
-            );
-            if (!notificationRes) {
-                // api
-                response = await fetch(
-                    `/api/notifications/users/${customerId}`,
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            orderId,
-                            message: `訂單 ${orderId.slice(0, 8)} 正在製作中`,
-                        }),
-                    }
-                );
-                if (!response.ok) {
-                    alert("傳送通知失敗");
-                    return;
-                }
-                notificationRes = await response.json();
-            }
-
-            // 接受訂單，傳送通知給使用者
-            const topic = ""; // TODO: 設定 MQTT 主題
-            if (notificationRes && notificationRes.id) {
-                // TODO: 準備 MQTT 訊息內容
-                // TODO: 發布 MQTT 訊息(通知)
-            }
-
-            // 發布訂單資料到廚房
-            const kitchenTopic = ""; // TODO: 設定廚房 MQTT 主題
-
-            // TODO: 準備廚房訂單資料
-
-            // TODO: 發布廚房訂單資料到 MQTT
-
-            if (!response.ok) {
-                alert("傳送通知失敗");
-                return;
-            }
-        } catch (error) {
-            console.error("Failed to update order status:", error);
+        if (!acceptedOrder.paymentStatus) {
+            alert("請先確認顧客已付款！");
+            return;
         }
+
+        try {
+            const data = await editOrderStatus({ status: "PREPARING" }, orderId);
+            if (!data) throw new Error("修改訂單狀態失敗");
+
+            updateOrderStatus(orderId, { status: "PREPARING" });
+
+            const message = `訂單 ${orderId.slice(0, 8)} 商家已接單，正在準備中`;
+            const customerId = acceptedOrder.customerId;
+
+            const notificationRes = await addNotification({ orderId, message }, customerId);
+            if (!notificationRes) throw new Error("傳送通知失敗");
+
+            const notifyTopic = getNotificationTopicByUserId(customerId);
+            publishMessage(notifyTopic, JSON.stringify({
+                notificationId: notificationRes.id,
+                message,
+            }));
+
+            const kitchenTopic = getOrderToKitchenTopic();
+            const kitchenPayload = JSON.stringify({
+                orderId: acceptedOrder.id,
+                items: acceptedOrder.items.map((item) => ({
+                    name: item.menuItem.name,
+                    quantity: item.quantity,
+                    specialRequest: item.specialRequest,
+                })),
+                totalAmount: acceptedOrder.totalAmount,
+                createdAt: acceptedOrder.createdAt,
+            });
+            publishMessage(kitchenTopic, kitchenPayload);
+
+        } catch (error) {
+            console.error("接受訂單失敗:", error);
+            alert(`❌ 接受訂單失敗：${error.message}`);
+        }
+    };
+
+    const handleConfirmPayment = async (orderId) => {
+        try {
+            const res = await editOrderStatus({ paymentStatus: true }, orderId);
+            if (!res) throw new Error("更新付款狀態失敗");
+
+            updateOrderStatus(orderId, { paymentStatus: true });
+
+            const order = orders.find((o) => o.id === orderId);
+            if (!order) return;
+
+            const message = `訂單 ${orderId.slice(0, 8)} 已確認付款`;
+            const customerId = order.customerId;
+
+            const notificationRes = await addNotification({ orderId, message }, customerId);
+            if (!notificationRes) throw new Error("傳送通知失敗");
+
+            const topic = getNotificationTopicByUserId(customerId);
+            publishMessage(topic, JSON.stringify({
+                message,
+                notificationId: notificationRes.id
+            }));
+
+        } catch (err) {
+            console.error("確認付款失敗:", err);
+            alert(`❌ 確認付款失敗：${err.message}`);
+        }
+    };
+
+    const handleDeleteOrder = async (orderId, customerId) => {
+        try {
+            const res = await fetch(`/api/orders/${orderId}`, {
+                method: "DELETE",
+            });
+            if (!res.ok) throw new Error("✅");
+
+            setOrders((prev) => prev.filter((order) => order.id !== orderId));
+            alert("✅ 已刪除訂單");
+
+            const message = `訂單 ${orderId.slice(0, 8)} 已被商家取消`;
+            const notifyRes = await addNotification({ orderId, message }, customerId);
+            if (notifyRes) {
+                const topic = getNotificationTopicByUserId(customerId);
+                publishMessage(topic, JSON.stringify({
+                    notificationId: notifyRes.id,
+                    message,
+                }));
+            }
+
+            const kitchenTopic = getOrderToKitchenTopic();
+            publishMessage(kitchenTopic, JSON.stringify({
+                type: "CANCEL_ORDER",
+                orderId
+            }));
+
+        } catch (err) {
+            console.error("刪除訂單錯誤:", err);
+            alert("已刪除" + err.message);
+        }
+    };
+
+    const renderOrderActions = (order) => {
+        const isLocallyAccepted = order.uiAccepted;
+
+        if (order.status === "PENDING" && !isLocallyAccepted) {
+            return (
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => updateOrderStatus(order.id, { uiAccepted: true })}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+                    >
+                        接受訂單
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (confirm("確定要刪除此訂單嗎？")) {
+                                handleDeleteOrder(order.id, order.customerId);
+                            }
+                        }}
+                        className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition"
+                    >
+                        刪除訂單
+                    </button>
+                </div>
+            );
+        }
+
+        if (order.status === "PENDING" && isLocallyAccepted) {
+            return (
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => handleConfirmPayment(order.id)}
+                        className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition"
+                        disabled={order.paymentStatus}
+                    >
+                        {order.paymentStatus ? "已確認付款" : "確認付款"}
+                    </button>
+                    <button
+                        onClick={() => handleAcceptOrder(order.id)}
+                        className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 transition"
+                    >
+                        標記為製作中
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (confirm("確定要刪除此訂單嗎？")) {
+                                handleDeleteOrder(order.id, order.customerId);
+                            }
+                        }}
+                        className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition"
+                    >
+                        刪除訂單
+                    </button>
+                </div>
+            );
+        }
+
+        if (order.status === "READY") {
+            return (
+                <p className="text-green-600 font-semibold">餐點已完成，等待取餐</p>
+            );
+        }
+
+        return null;
     };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-orange-100 via-pink-100 to-red-100 px-4 sm:px-6 py-8">
             <div className="max-w-5xl mx-auto">
                 <h1 className="text-3xl font-bold mb-6 text-center sm:text-left text-gray-800">
-                    待處理訂單
+                    進行中訂單
                 </h1>
 
                 {orders.length === 0 ? (
                     <p className="text-gray-500 text-center sm:text-left">
-                        目前沒有待處理訂單。
+                        目前沒有進行中的訂單。
                     </p>
                 ) : (
                     <div className="space-y-6">
@@ -179,22 +276,33 @@ export default function PendingOrdersPage() {
                                             訂單 #{order.id.slice(0, 8)}
                                         </h3>
                                         <p className="text-sm text-gray-500">
-                                            {new Date(
-                                                order.createdAt
-                                            ).toLocaleString()}
+                                            {new Date(order.createdAt).toLocaleString()}
                                         </p>
                                     </div>
-                                    <div></div>
+                                    <div className="text-sm font-semibold mt-2 sm:mt-0">
+                                        狀態：
+                                        <span className={`px-2 py-1 rounded-full text-white ${
+                                            order.status === 'PENDING' ? 'bg-gray-500' :
+                                            order.status === 'PREPARING' ? 'bg-blue-500' :
+                                            order.status === 'READY' ? 'bg-green-500' : 'bg-red-500'
+                                        }`}>
+                                            {order.status}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div className="mb-3 space-y-1">
                                     <p className="text-gray-700">
-                                        <strong>總金額：</strong> $
-                                        {order.totalAmount.toFixed(2)}
+                                        <strong>總金額：</strong> ${order.totalAmount.toFixed(2)}
                                     </p>
                                     <p className="text-gray-700">
-                                        <strong>顧客：</strong>{" "}
-                                        {order.customer.name}
+                                        <strong>顧客：</strong> {order.customer.name}
+                                    </p>
+                                    <p className="text-gray-700">
+                                        <strong>付款狀態：</strong>
+                                        <span className={order.paymentStatus ? "text-green-600" : "text-red-600"}>
+                                            {order.paymentStatus ? "已付款" : "未付款"}
+                                        </span>
                                     </p>
                                 </div>
 
@@ -209,40 +317,23 @@ export default function PendingOrdersPage() {
                                                 className="flex justify-between text-sm text-gray-600"
                                             >
                                                 <span>
-                                                    {item.menuItem.name} ×{" "}
-                                                    {item.quantity}
+                                                    {item.menuItem.name} × {item.quantity}
                                                     {item.specialRequest && (
                                                         <span className="block text-xs text-gray-400">
-                                                            備註：
-                                                            {
-                                                                item.specialRequest
-                                                            }
+                                                            備註：{item.specialRequest}
                                                         </span>
                                                     )}
                                                 </span>
                                                 <span>
-                                                    $
-                                                    {(
-                                                        item.menuItem.price *
-                                                        item.quantity
-                                                    ).toFixed(2)}
+                                                    ${(item.menuItem.price * item.quantity).toFixed(2)}
                                                 </span>
                                             </li>
                                         ))}
                                     </ul>
                                 </div>
 
-                                <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3">
-                                    {order.status === "PENDING" && (
-                                        <button
-                                            onClick={() =>
-                                                handleAcceptOrder(order.id)
-                                            }
-                                            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
-                                        >
-                                            接受訂單
-                                        </button>
-                                    )}
+                                <div className="mt-6 flex flex-col sm:flex-row justify-end items-center gap-3">
+                                    {renderOrderActions(order)}
                                 </div>
                             </div>
                         ))}

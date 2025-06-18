@@ -4,7 +4,7 @@ const getTopicRoot = () => {
     if (!TOPIC_ROOT) {
         throw new Error("未填寫 .env 的 NEXT_PUBLIC_MQTT_TOPIC_ROOT");
     }
-    return `nuu/csie/${TOPIC_ROOT}`;
+    return `nuu/shisa/${TOPIC_ROOT}`;
 };
 
 export const getOrderCheckoutTopic = () => {
@@ -35,4 +35,14 @@ export const getCustomerCancelOrderTopic = (customerId: number | string) => {
 export const getOrderStatusWildcardTopic = (customerId: number | string) => {
     const topicRoot = getTopicRoot();
     return `${topicRoot}/notify/order/+/${customerId}`;
+}
+export function getOrderToKitchenTopic() {
+  return `nuu/shisa/orders/to-kitchen`;
+}
+
+export function getNotificationTopicByUserId(userId: string) {
+  return `nuu/shisa/notifications/${userId}`;
+}
+export function getCustomerOrderUpdateTopic(customerId: string) {
+  return `nuu/shisa/customer/${customerId}/orders/updated`;
 }

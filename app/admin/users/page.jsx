@@ -20,17 +20,17 @@ export default function AdminUsersPage() {
             const response = await fetch("/api/users");
             if (!response.ok) {
                 alert("獲取使用者失敗");
+                return;
             }
             const data = await response.json();
-            const formedData = data.map((item) => {
-                return {
-                    id: item.id,
-                    email: item.email,
-                    role: item.role,
-                    name: item.name,
-                    createdAt: new Date(item.createdAt).toLocaleString("sv"),
-                };
-            });
+            const formedData = data.map((item) => ({
+                id: item.id,
+                email: item.email,
+                role: item.role,
+                name: item.name,
+                isBanned: item.isBanned,
+                createdAt: new Date(item.createdAt).toLocaleString("sv"),
+            }));
             setUsers(formedData);
             setLoading(false);
         };
@@ -48,8 +48,24 @@ export default function AdminUsersPage() {
         });
         if (!response.ok) {
             alert("更改使用者權限失敗");
+        }
+    };
+
+    const handleBanToggle = async (userId, newStatus) => {
+        const response = await fetch(`/api/users/${userId}/ban`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isBanned: newStatus }),
+        });
+        if (!response.ok) {
+            alert("更新停權狀態失敗");
             return;
         }
+        setUsers((prev) =>
+            prev.map((user) =>
+                user.id === userId ? { ...user, isBanned: newStatus } : user
+            )
+        );
     };
 
     const filteredUsers = users.filter((u) =>
@@ -94,31 +110,40 @@ export default function AdminUsersPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.3 }}
                             >
-                                <h3 className="text-lg font-bold text-gray-800 mb-2">
+                                <h3 className="text-lg font-bold text-gray-800 mb-1">
                                     {user.name}
                                 </h3>
-                                <p className="text-sm text-gray-600 mb-2">
+                                <p className="text-sm text-gray-600 mb-1">
                                     {user.email}
                                 </p>
                                 <p className="text-xs text-gray-500 mb-2">
-                                    建立時間：
-                                    {new Date(
-                                        user.createdAt
-                                    ).toLocaleDateString()}
+                                    建立時間：{new Date(user.createdAt).toLocaleDateString()}
                                 </p>
 
-                                <label className="text-sm font-medium text-gray-700">
+                                {/* 狀態顯示 */}
+                                <p className={`text-sm font-semibold mb-2 ${user.isBanned ? "text-red-500" : "text-green-600"}`}>
+                                    狀態：{user.isBanned ? "已停權" : "正常"}
+                                </p>
+
+                                {/* 切換停權按鈕 */}
+                                <button
+                                    onClick={() => handleBanToggle(user.id, !user.isBanned)}
+                                    className={`px-3 py-1 mb-3 rounded text-white text-sm 
+                                        ${user.isBanned ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"}`}
+                                >
+                                    {user.isBanned ? "解除停權" : "停權"}
+                                </button>
+
+                                {/* 角色切換 */}
+                                <label className="text-sm font-medium text-gray-700 block mt-2">
                                     切換角色
                                 </label>
                                 <select
                                     value={user.role}
                                     onChange={(e) =>
-                                        handleRoleChange(
-                                            user.id,
-                                            e.target.value
-                                        )
+                                        handleRoleChange(user.id, e.target.value)
                                     }
-                                    className="block w-full mt-1 mb-4 px-3 py-2 border rounded focus:outline-none focus:ring-pink-400"
+                                    className="block w-full mt-1 px-3 py-2 border rounded focus:outline-none focus:ring-pink-400"
                                     disabled={user.role === "OWNER"}
                                 >
                                     <option value={user.role}>
@@ -127,8 +152,7 @@ export default function AdminUsersPage() {
                                     {Object.entries(roleLabels)
                                         .filter(
                                             ([key]) =>
-                                                key !== "OWNER" &&
-                                                key !== user.role
+                                                key !== "OWNER" && key !== user.role
                                         )
                                         .map(([key, label]) => (
                                             <option key={key} value={key}>
@@ -143,4 +167,6 @@ export default function AdminUsersPage() {
             </div>
         </div>
     );
-}
+    }
+
+

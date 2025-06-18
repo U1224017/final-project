@@ -1,7 +1,7 @@
 // app/actions/menu.js
 'use server'; // 標記為 Server Action
 
-import prisma from '@/lib/prisma'; // 引入 Prisma 客戶端
+import { prisma } from '@/lib/prisma'; // 引入 Prisma 客戶端
 import { promises as fs } from 'fs'; // 引入 Node.js 的檔案系統模組
 import path from 'path'; // 引入 Node.js 的路徑模組
 

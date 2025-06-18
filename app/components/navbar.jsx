@@ -41,9 +41,9 @@ export default function Navbar() {
                 return [
                     { href: "/admin/menu", name: "菜單管理" },
                     { href: "/admin/users", name: "使用者管理" },
-                    { href: "/admin/orders/pending", name: "等待中的訂單" },
-                    { href: "/admin/orders/completed", name: "完成的訂單" },
-                    { href: "/admin/orders/kitchen", name: "廚房訂單" },
+                    { href: "/orders/pending", name: "等待中的訂單" },
+                    { href: "/orders/ready", name: "完成的訂單" },
+                    { href: "/kitchen", name: "廚房訂單" },
                 ];
             default:
                 return [];

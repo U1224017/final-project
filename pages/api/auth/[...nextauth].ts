@@ -43,6 +43,31 @@ const authOptions = {
   ],
 
   callbacks: {
+    // 新增 jwt callback，登入時從資料庫抓 role 並放進 token
+    async jwt({ token, user }) {
+      if (user) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email },
+        });
+        if (dbUser) {
+          token.role = dbUser.role;
+          token.id = dbUser.id;
+        }
+      }
+      return token;
+    },
+
+    // 修改 session callback，從 token 取 role 放入 session.user
+    async session({ session, token }) {
+      if (!session?.user) return session;
+
+      session.user.id = token.id as string;
+      session.user.role = token.role as string;
+      session.user.isBanned = token.isBanned as boolean;
+
+      return session;
+    },
+
     async signIn({ user }) {
       try {
         if (!user?.email) return false;
@@ -74,26 +99,6 @@ const authOptions = {
         console.error("signIn error:", error);
         return false;
       }
-    },
-
-    async session({ session }) {
-      if (!session?.user?.email) return session;
-
-      try {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: session.user.email },
-        });
-
-        if (dbUser) {
-          session.user.id = dbUser.id;
-          session.user.role = dbUser.role;
-          session.user.isBanned = dbUser.isBanned;
-        }
-      } catch (error) {
-        console.error("session callback error:", error);
-      }
-
-      return session;
     },
 
     async redirect({ url, baseUrl }) {

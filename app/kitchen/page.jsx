@@ -1,8 +1,7 @@
 "use client";
-
 import { useEffect, useState, useMemo } from "react";
 import { useMqttClient } from "@/hooks/useMqttClient";
-import { editOrderStatus, getKitchenOrders } from "@/app/actions/order";
+import { editOrderStatus, getKitchenOrders, editOrderCompletion } from "@/app/actions/order";
 import { addNotification } from "@/app/actions/notification";
 import { getKitchenOrderTopic } from "@/utils/mqttTopic";
 
@@ -17,24 +16,19 @@ export default function KitchenPage() {
     useEffect(() => {
         const fetchOrders = async () => {
             try {
-                let data = await getKitchenOrders();
-                if (!data) {
-                    const response = await fetch("/api/orders/kitchen");
-                    if (!response.ok) {
-                        alert("取得廚房訂單失敗");
-                        return;
-                    }
-                    data = await response.json();
-                }
-
-                setOrders(data);
-            } catch (err) {
+            let data = await getKitchenOrders();
+            if (!data) {
                 alert("取得廚房訂單失敗");
+                return;
+            }
+
+            setOrders(data);
+            } catch (err) {
+            alert("取得廚房訂單失敗");
             }
         };
         fetchOrders();
-    }, []);
-
+        }, []);
     useEffect(() => {
         if (messages.length === 0) return;
 
@@ -52,61 +46,62 @@ export default function KitchenPage() {
 
     const handleCompleteOrder = async (orderId) => {
         try {
-            let data = await editOrderStatus({ status: "READY" }, orderId);
-            let response;
-            if (!data) {
-                response = await fetch(`/api/orders/${orderId}/status`, {
-                    method: "PATCH",
-                    body: JSON.stringify({ status: "READY" }),
-                });
-                if (!response.ok) {
-                    alert("完成訂單失敗");
-                    return;
-                }
+            // 標記為已完成（isCompleted = true）
+            const completeRes = await editOrderCompletion(orderId);
+            if (!completeRes) {
+            alert("❌ 標記完成失敗！");
+            return;
             }
 
+            // 嘗試設為 READY（會判斷付款是否完成）
+            const data = await editOrderStatus({ status: "READY" }, orderId);
+            if (!data) {
+            alert("❌ 設定為 READY 失敗（可能尚未付款）");
+            return;
+            }
+
+            // 從 UI 移除該訂單
             setOrders((prev) => prev.filter((order) => order.id !== orderId));
 
-            const customerId = orders.find(
-                (order) => order.id === orderId
-            ).customerId;
+            // 發送通知
+            const orderToUpdate = orders.find((order) => order.id === orderId);
+            const customerId = orderToUpdate?.customerId;
 
-            let notificationRes = await addNotification(
-                {
-                    orderId,
-                    message: `可領取訂單 ${orderId.slice(0, 8)}`,
-                },
-                customerId
-            );
+            if (!customerId) {
+            alert("找不到顧客資料");
+            return;
+            }
+            const message = `可領取訂單 ${orderId.slice(0, 8)}`;
+
+            let notificationRes = await addNotification({ orderId, message }, customerId);
             if (!notificationRes) {
-                response = await fetch(`/api/notifications/users/${customerId}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        orderId,
-                        message: `可領取訂單 ${orderId.slice(0, 8)}`,
-                    }),
-                });
-                if (!response.ok) {
-                    alert("傳送通知失敗");
-                    return;
-                }
-                notificationRes = await response.json();
+            const res = await fetch(`/api/notifications/users/${customerId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId, message }),
+            });
+            if (!res.ok) {
+                alert("傳送通知失敗");
+                return;
+            }
+            notificationRes = await res.json();
             }
 
-            const readyNotificationTopic = `nuu/csie/testtopic/notify/order/${customerId}`;
-            if (notificationRes && notificationRes.id) {
-                const messagePayload = JSON.stringify({
-                    type: "READY",
-                    message: `訂單 ${orderId.slice(0, 8)} 已準備好`,
-                    notificationId: notificationRes.id,
-                });
-                publishMessage(readyNotificationTopic, messagePayload);
+            const readyNotificationTopic = `nuu/shisa/beigo/notify/order${customerId}`;
+            if (notificationRes?.id) {
+            const messagePayload = JSON.stringify({
+                type: "READY",
+                message: `訂單 ${orderId.slice(0, 8)} 已準備好`,
+                notificationId: notificationRes.id,
+            });
+            publishMessage(readyNotificationTopic, messagePayload);
             }
         } catch (error) {
             console.error("完成訂單失敗:", error);
         }
-    };
+        };
+
+
 
     return (
         <main className="max-w-7xl mx-auto px-4 py-8">
@@ -154,7 +149,7 @@ export default function KitchenPage() {
                             </div>
                             <button
                                 onClick={() =>
-                                    handleCompleteOrder(order.orderId || order.id)
+                                    handleCompleteOrder(order.id)
                                 }
                                 className="mt-5 w-full bg-green-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-green-700 transition"
                             >
